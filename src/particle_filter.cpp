@@ -6,7 +6,6 @@
  */
 
 #include "particle_filter.h"
-
 #include <math.h>
 #include <algorithm>
 #include <iostream>
@@ -15,8 +14,12 @@
 #include <random>
 #include <string>
 #include <vector>
-
 #include "helper_functions.h"
+// Trying to avoid nasty things including asserts
+#include <assert.h>
+//Random number generator
+static std::default_random_engine gen;
+#define YAW_MIN 0.0001
 
 using std::string;
 using std::vector;
@@ -30,8 +33,29 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  num_particles = 0;  // TODO: Set the number of particles
 
+	//Check for inconsistencies before starting
+	assert(std[0] != 0 && std[1] != 0 && std[2] != 0);
+	assert(is_initialized == false);
+
+  num_particles = 1000;  // TODO: Set the number of particles
+  // Going crazy is not advised since this C++ program is not multicore enabled
+
+  // This line creates a normal (Gaussian) distribution for x
+  std::normal_distribution<double> dist_x(x, std[0]);
+
+  // TODO: Create normal distributions for y and theta
+  std::normal_distribution<double> dist_y(y, std[1]);
+  std::normal_distribution<double> dist_theta(theta, std[2]);
+
+  // Start instantiating particle structs
+  for (int i = 0; i < num_particles; i++) {
+	  //struct Particle {int id;double x;double y;double theta;double weight; std::vector<int> associations;std::vector<double> sense_x;std::vector<double> sense_y;
+	  
+	  Particle newParticle = {i,dist_x(gen),dist_y(gen),dist_theta(gen),1.0};
+	  particles.push_back(newParticle);
+  }
+  is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
@@ -44,6 +68,38 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *  http://www.cplusplus.com/reference/random/default_random_engine/
    */
 
+
+	//Basic consistency checks
+	assert(std_pos[0] != 0 && std_pos[1] != 0 && std_pos[2] != 0);
+	assert(is_initialized == true);
+
+	//Now we update the particles
+
+	for (int i = 0; i < num_particles; i++) {
+		//Two cases here, with yaw rate or without yaw rate (equations change)
+		if (fabs(yaw_rate) < YAW_MIN) {
+			particles[i].x += velocity * delta_t * cos(particles[i].theta);
+			particles[i].y += velocity * delta_t * sin(particles[i].theta);
+		}
+		else {
+			particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
+			particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
+			particles[i].theta += yaw_rate * delta_t;
+		}
+	}
+	//Generate gaussian noise distributions
+	std::normal_distribution<double> gnoise_x(0, std_pos[0]);
+	std::normal_distribution<double> gnoise_y(0, std_pos[1]);
+	std::normal_distribution<double> gnoise_theta(0, std_pos[2]);
+
+	//Apply gaussian noise
+	for (int i = 0; i < num_particles; i++) {
+		particles[i].x +=  gnoise_x(gen);
+		particles[i].y +=  gnoise_y(gen);
+		particles[i].theta +=  gnoise_theta(gen);
+	}
+
+	
 }
 
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, 
@@ -56,6 +112,11 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   probably find it useful to implement this method and use it as a helper 
    *   during the updateWeights phase.
    */
+
+	// We need to compute 
+
+
+
 
 }
 
